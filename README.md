@@ -4,6 +4,7 @@
 
 - `cmd/tutorial1/` : エラーハンドリングや基本文法を学んだチュートリアル
 - `arrays-maps/` : 配列・マップを学ぶためのフォルダ（まだ未実装・空ファイル）
+- `goroutines/` : ゴルーチン（並行処理）、`sync.WaitGroup`、`sync.RWMutex`を学ぶためのフォルダ
 
 ## 学習内容
 
@@ -52,3 +53,32 @@
 ### 7. 文字列フォーマット
 - `fmt.Println(value)` : 改行付きで値を出力する
 - `fmt.Printf("...%v...\n", value)` : `%v` を使って値を埋め込んでフォーマット出力する
+
+### 8. ゴルーチンと並行処理 (goroutines / concurrency)
+
+#### goroutineの役割と仕組み
+- goroutineはGoランタイムが管理する軽量な実行単位（OSスレッドより軽く、小さいスタックから必要に応じて伸長する）
+- `go 関数名()` と書くだけでその関数を新しいgoroutineとして非同期に起動できる（呼び出し元は終了を待たずに次へ進む）
+- Goランタイム内のスケジューラが、多数のgoroutineを少数のOSスレッドに割り振って実行する（M個のスレッドにN個のgoroutineを割り当てるM:N方式）
+- concurrency（並行）とparallelism（並列）は別物
+  - 並行：複数のタスクを切り替えながら同時に「進行」させること（CPU1コアでも可能）
+  - 並列：実際に複数CPUコアで同時に「実行」すること
+  - GOMAXPROCSの数までは並列実行も行われ、それを超える分は並行に切り替えながら処理される
+
+#### Mutexの使い方
+- 複数のgoroutineが同じ変数（共有データ）に同時に読み書きすると、データ競合（race condition）が発生する
+- `sync.Mutex` : `Lock()`で他のgoroutineをブロックし、`Unlock()`で解放する。ロック中はその区間に1つのgoroutineしか入れない
+- `sync.RWMutex` : 読み書き用のロック
+  - 書き込み時：`Lock()` / `Unlock()`（排他、1つだけ）
+  - 読み込み時：`RLock()` / `RUnlock()`（複数goroutineが同時に読める。書き込み中は待たされる）
+- 例（goroutines/main.go の `save()` / `log()`、現在はコメントアウト）
+  - `save()`：`m.Lock()` → `results = append(...)` → `m.Unlock()` で書き込みを保護
+  - `log()`：`m.RLock()` → 読み取り → `m.RUnlock()` で読み取り中の安全性を確保
+
+#### sync.WaitGroup
+- `wg.Add(1)` で待つ数を+1、ゴルーチン内で `wg.Done()` を呼ぶと-1
+- `wg.Wait()` でカウントが0になるまでブロックする
+
+#### 実行結果（count()を5つゴルーチンで並行実行、各回1億回ループ）
+- 合計実行時間：約93ms
+- → 1つずつ順番に実行するより大幅に速い＝並行に動いている証拠
